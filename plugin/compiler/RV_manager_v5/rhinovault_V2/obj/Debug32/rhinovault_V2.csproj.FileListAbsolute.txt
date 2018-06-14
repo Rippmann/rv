@@ -1,0 +1,10 @@
+C:\Users\rippmanm\workspace\matthias.rippmann\rhinovault\rhinovault_V2\rhinovault_V2\bin\rhinovault_V2.dll
+C:\Users\rippmanm\workspace\matthias.rippmann\rhinovault\rhinovault_V2\rhinovault_V2\bin\rhinovault_V2.pdb
+C:\Users\rippmanm\workspace\matthias.rippmann\rhinovault\rhinovault_V2\rhinovault_V2\obj\Debug32\rhinovault_V2.csprojResolveAssemblyReference.cache
+C:\Users\rippmanm\workspace\matthias.rippmann\rhinovault\rhinovault_V2\rhinovault_V2\obj\Debug32\rhinovault_V2.dll
+C:\Users\rippmanm\workspace\matthias.rippmann\rhinovault\rhinovault_V2\rhinovault_V2\obj\Debug32\rhinovault_V2.pdb
+C:\Users\rippmanm\Documents\GitHub\rv\src\rhinovault_V2.dll
+C:\Users\rippmanm\Documents\GitHub\rv\src\rhinovault_V2.pdb
+C:\Users\rippmanm\Documents\GitHub\rv\plugin\compiler\RV_manager_v5\rhinovault_V2\obj\Debug32\rhinovault_V2.csprojResolveAssemblyReference.cache
+C:\Users\rippmanm\Documents\GitHub\rv\plugin\compiler\RV_manager_v5\rhinovault_V2\obj\Debug32\rhinovault_V2.dll
+C:\Users\rippmanm\Documents\GitHub\rv\plugin\compiler\RV_manager_v5\rhinovault_V2\obj\Debug32\rhinovault_V2.pdb

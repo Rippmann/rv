@@ -1,0 +1,4 @@
+C:\Users\rippmanm\Documents\GitHub\rv\src\compas_rv\rhino\compiler\RV_manager\RV_manager\bin\RV_manager.dll
+C:\Users\rippmanm\Documents\GitHub\rv\src\compas_rv\rhino\compiler\RV_manager\RV_manager\bin\RV_manager.pdb
+C:\Users\rippmanm\Documents\GitHub\rv\src\compas_rv\rhino\compiler\RV_manager\RV_manager\obj\Debug\RV_manager.dll
+C:\Users\rippmanm\Documents\GitHub\rv\src\compas_rv\rhino\compiler\RV_manager\RV_manager\obj\Debug\RV_manager.pdb

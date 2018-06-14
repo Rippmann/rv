@@ -1,29 +1,21 @@
 
-
-import Rhino
-import rhinoscriptsyntax as rs
 import scriptcontext as sc
-import System.Array, System.Drawing.Color
-import random
-import string
-import time
+import rhinoscriptsyntax as rs
+import Rhino
+import System
 
-try:
-   import cPickle as pickle
-except:
-   import pickle
+import time
 
 from compas.datastructures.mesh import Mesh
 
 from compas.utilities import geometric_key
 from compas.geometry import centroid_points
-from Rhino.RhinoMath import UnsetIntIndex
 
-from utilities import verboseprint
+from compas_rv.utilities.functions import verboseprint
 
 add_line = sc.doc.Objects.AddLine
 point_3d = Rhino.Geometry.Point3d
-find_id = sc.doc.Objects.FindId
+find_id = sc.doc.Objects.Find #sc.doc.Objects.FindId in Rhino6
 line_curve = Rhino.Geometry.LineCurve
 replace_obj = sc.doc.Objects.Replace
 from_rgb = System.Drawing.Color.FromArgb
@@ -38,7 +30,7 @@ def mesh_to_rhino(mesh, layer):
     rc = sc.doc.Groups.GroupName(index)
 
     # get layer index
-    layer_index = sc.doc.Layers.FindByFullPath(layer, UnsetIntIndex)
+    layer_index = sc.doc.Layers.FindByFullPath(layer, -2147483647)
     layer_rh = sc.doc.Layers[layer_index]
     index = layer_rh.LayerIndex
     
