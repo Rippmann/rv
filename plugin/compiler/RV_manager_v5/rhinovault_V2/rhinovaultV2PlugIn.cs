@@ -48,7 +48,7 @@ namespace rhinovault_V2
             foreach (string filepath in files)
             {
 
-                bool b = filepath.Contains("RV");
+                bool b = filepath.Contains("Rv");
                 if (b)
                 {
                     //RhinoApp.WriteLine(filepath);

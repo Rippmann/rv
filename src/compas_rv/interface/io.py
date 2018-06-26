@@ -1,4 +1,3 @@
-
 import scriptcontext as sc
 import rhinoscriptsyntax as rs
 import Rhino
@@ -11,7 +10,7 @@ from compas.datastructures.mesh import Mesh
 from compas.utilities import geometric_key
 from compas.geometry import centroid_points
 
-from compas_rv.utilities.functions import verboseprint
+from compas_rv.commands._config import verboseprint
 
 add_line = sc.doc.Objects.AddLine
 point_3d = Rhino.Geometry.Point3d

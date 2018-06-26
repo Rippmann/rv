@@ -4,14 +4,16 @@ class RVsettings(object):
     
     name        = "RhinoVault"
     version     = "2.0.0.1" 
-    
+    f_precision = '3f'
 
 class RVinfo(object):
     
     messages = {
     'e_plugin'  : "Plugin not or incorrectly installed. Check installation instructions.",
     'e_object'  : "No object selected.",
-    'e_objects' : "No objects selected.",
+    'e_objects' : "No or not sufficient objects selected.",
+    'e_closed'  : "Set of curves must enclose spaces. No single-end curves allowed.",
+    'e_discon'  : "Set of curves must define only one connected mesh.",
     'i_init'    : "Internal attempt to re-initiate plugin."    
     }
     @staticmethod
@@ -47,6 +49,30 @@ class RVinfo(object):
         # |              5      Ignore button was clicked.
         # |              6      Yes button was clicked.
         # |              7      No button was clicked.
+
+
+verbose = False
+if verbose:
+    def verboseprint(*args):
+        # Print each argument separately so caller doesn't need to
+        # stuff everything to be printed into a single string
+        for arg in args:
+           print arg,
+        print
+else:   
+    verboseprint = lambda *a: None      # do-nothing function
+    
+    
+def delete_alias():
+    names = rs.AliasNames()
+    print names
+    del_all = True
+    for name in names:
+        if 'Rv' in name or del_all:
+            rs.DeleteAlias(name)
+
+if __name__ == '__main__':
+    delete_alias()
 
 
 

@@ -4,7 +4,8 @@ import os
 import scriptcontext as sc 
 import Rhino
 
-from config import RVinfo
+from _config import RVinfo
+from _config import verboseprint
 
 def sys_path_init(): 
     info = RVinfo
@@ -13,8 +14,8 @@ def sys_path_init():
         path = sc.sticky["path"]
         sys.path.append(path)
     except:
-        print info.message('i_init')
-        path = Rhino.PlugIns.PlugIn.PathFromName("rhinovault_V2s")
+        verboseprint(info.message('i_init'))
+        path = Rhino.PlugIns.PlugIn.PathFromName("rhinovault_V2")
         if path:
             path = os.path.split(path)[0]
             sys.path.append(path)
