@@ -9,10 +9,15 @@ import rhinoscriptsyntax as rs
 
 import json
 import random
+import itertools
+import copy
 from _config import RVinfo
 from _config import RVsettings
 
 from compas.datastructures import Mesh
+
+
+
 from compas.datastructures import Network
 from compas.utilities import geometric_key
 
@@ -22,6 +27,9 @@ from compas.geometry import centroid_points
 from compas.geometry.algorithms import discrete_coons_patch
 from compas.geometry import mesh_cull_duplicate_vertices
 
+from compas.geometry import add_vectors
+from compas.geometry import subtract_vectors
+from compas.geometry import scale_vector
 
 from compas.geometry import mesh_smooth_area
 from compas.geometry import mesh_smooth_centroid
@@ -139,6 +147,7 @@ def find_devisions(mesh, edge_groups, trg_len):
             ave_len = lengths / len(edges)
             div = max((round(ave_len / trg_len,0),1))
             
+            
         for u,v in edges:
            crv = mesh.get_edge_attribute((u,v),'guid')
            pts = rs.DivideCurve(crv,div)
@@ -164,33 +173,52 @@ def find_devisions(mesh, edge_groups, trg_len):
             pts_coon.append(pts)
             
         # handle triangles correctly based on user input (flag 0 - 2)
+        lengths = [len(pts_coon[0]), len(pts_coon[1])]
         if len(h_edges) == 4:
             ab,bc,dc,ad = pts_coon
         else:
             flag = mesh.get_face_attribute(fkey,'corner')
-
             if flag == 0:
                 ab,bc,dc,ad = pts_coon[0],pts_coon[1],[],pts_coon[2]
             elif flag == 1:
                 ab,bc,dc,ad = pts_coon[0],[],pts_coon[1],pts_coon[2]
+                lengths = [len(pts_coon[0]), len(pts_coon[2])]
             elif flag == 2:
                 ab,bc,dc,ad = pts_coon[0],pts_coon[1],pts_coon[2],[]
-        
+                
         # reverse for coons patch (see parameters)
         dc.reverse()
         ad.reverse()
             
+        
         vertices, faces = discrete_coons_patch(ab,bc,dc,ad)
-        coons_meshes.append((vertices, faces))
+        coons_meshes.append((vertices, faces, lengths))
 
     # join al sub "meshes" of the coons patches in one mesh (with duplicate vertices)
     inc = 0
     mesh = Mesh()
     for coons_mesh in coons_meshes:
-        vertices, faces = coons_mesh
+        vertices, faces, lengths = coons_mesh
+        
+        a, b = lengths
+        
+        indices = []
+        for i,pt in enumerate(vertices):
+            indices.append(i)
+            pass
+        
+   
+        
+        indices = indices[::b] + indices[b-1::b]+ indices[:b] + indices[(a-1)*b:]
+        indices = set(indices)
+        
         
         for i,pt in enumerate(vertices):
-            mesh.add_vertex(i + inc, x=pt[0], y=pt[1], z=pt[2])
+            if i in indices:
+                attr = {'coon_bound' : True}
+            else:
+                attr = {'coon_bound' : False}
+            mesh.add_vertex(i + inc, x=pt[0], y=pt[1], z=pt[2], attr_dict=attr)
         
         for face in faces:
             face = [key + inc for key in face]
@@ -247,8 +275,7 @@ def set_tri_corners(mesh):
             return None
         mesh.set_face_attribute(fkey,'corner',flag)
     
-    return mesh
-    
+    return True
 
 
 def lines_from_mesh(mesh):
@@ -258,7 +285,6 @@ def group_and_mesh(mesh, trg_len):
     edge_groups = find_groups(mesh)
     coons_mesh = find_devisions(mesh, edge_groups, trg_len)
     return coons_mesh
-
 
 def mesh_cull_duplicate_vertices(mesh, precision='3f'):
     """Cull all duplicate vertices of a mesh and sanitize affected faces.
@@ -358,13 +384,11 @@ def get_initial_mesh(precision):
     
     rs.DeleteObjects(dot_ids)
     
-    if not data:
-        return None
-    
-    for datum in data:
-        dot = datum[0]
-        fkey = dots[str(dot)]         
-        mesh.delete_face(fkey)
+    if data:
+        for datum in data:
+            dot = datum[0]
+            fkey = dots[str(dot)]         
+            mesh.delete_face(fkey)
         
     
     geo_edges = []
@@ -385,13 +409,187 @@ def get_initial_mesh(precision):
     for fkey, attr in mesh.faces(True):
         mesh.set_face_attribute(fkey,'corner',0)
         
-    return mesh
+    return mesh, crvs
 
+def get_boundary_crvs(mesh):
+    
+    b_crvs = []
+    for u,v in mesh.edges_on_boundary():
+        crv = mesh.get_edge_attribute((u,v),'guid')
+        b_crvs.append(crv)
+    return b_crvs
+
+        
+    
+    
+def set_boundary_cond(mesh,coons_mesh,precision):
+    
+    # set attribute 'fixed' as default to False
+    for key, attr in coons_mesh.vertices(True):
+        attr['fixed'] = False
+    
+    # get all boundary curves
+    crvs = get_boundary_crvs(mesh)
+    
+    # select optional open curves
+    data = rs.GetObjectsEx(message="Select open edges (optinal)", filter=0, preselect=False, select=False, objects=crvs)
+    #create list of open and
+    if data:
+        crvs_o = [str(datum[0]) for datum in data]
+    else: 
+        crvs_o = []
+
+    crvs_c = [crv for crv in crvs if crv not in crvs_o]
+    
+
+    # identify intersection points between open curves
+    fixed = {}
+    crvs_dict = {}
+    for crv in crvs:
+        pt_s = rs.CurveEndPoint(crv)
+        pt_e = rs.CurveStartPoint(crv)
+        geo_s = geometric_key(pt_s,precision)
+        geo_e = geometric_key(pt_e,precision)
+        fixed[geo_s] = pt_s
+        fixed[geo_e] = pt_e
+        crvs_dict[crv] = set([geo_s, geo_e])
+            
+    optional_fixed = {}
+    for a, b in itertools.combinations(crvs_o, 2):
+        geo_int = crvs_dict[str(a)] & crvs_dict[str(b)]
+        if geo_int:
+            for key in list(geo_int):
+                optional_fixed[key] = fixed[key] 
+
+
+    # select optional supports (alter optional_fixed)
+    rs.EnableRedraw(False)
+    dots = {}
+    for key, pt in optional_fixed.iteritems():
+        dot = rs.AddTextDot('', pt)
+        rs.TextDotHeight(dot,6)
+        dots[str(dot)] = key
+    
+    
+    rs.EnableRedraw(True)
+    if dots:
+        dot_ids = dots.keys()
+        data = rs.GetObjectsEx(message="Select additional supports (optional)", filter=0, preselect=False, select=False, objects=dot_ids)
+        
+        rs.DeleteObjects(dot_ids)
+        if data:
+            point_fixed = {}
+            for datum in data:
+                dot = datum[0]
+                point_fixed[dots[str(dot)]] = optional_fixed[dots[str(dot)]]
+            optional_fixed = point_fixed
+        else:
+            optional_fixed = {}
+        
+        
+    # fix all vertices that are on the origianl boundary of the coons patches and
+    # that are in the optinal fixed dict
+    coon_bound = {}
+    for key, attr in coons_mesh.vertices(True):
+        if attr['coon_bound']:
+            pt = coons_mesh.vertex_coordinates(key)
+            coon_bound[key] = pt
+            if geometric_key(pt,precision) in optional_fixed:
+                attr['fixed'] = True
+            
+    # fix all vertices that are on the closed curve boundaries
+    for key, pt in coon_bound.iteritems():
+        for crv in crvs_c:
+            if rs.IsPointOnCurve(crv,pt):
+                coons_mesh.set_vertex_attribute(key,'fixed', True)
+                break
+    
+    # test
+#    for key, attr in coons_mesh.vertices(True):
+#        #if attr['fixed']:
+#        if attr['coon_bound']:
+#            pt = coons_mesh.vertex_coordinates(key)
+#            rs.AddTextDot("",pt)
+
+def create_form_dia(mesh, layer):
+    
+    scale = 0.65
+    
+    
+    new_keys = []
+    for u,v in list(mesh.edges()):
+        u_fixed = mesh.get_vertex_attribute(u,'fixed')
+        v_fixed = mesh.get_vertex_attribute(v,'fixed')
+        
+        key = None
+        if not u_fixed and v_fixed:
+            nbrs = mesh.vertex_neighbours(v)
+            flag = True
+#            for nbr in nbrs:
+#                if not mesh.get_vertex_attribute(nbr,'fixed'):
+#                    flag = False
+#                    break
+            if flag:
+                new_keys.append(mesh.split_edge(u, v, t=scale, allow_boundary=True))
+        elif u_fixed and not v_fixed:
+            nbrs = mesh.vertex_neighbours(u)
+            flag = True
+#            for nbr in nbrs:
+#                if not mesh.get_vertex_attribute(nbr,'fixed'):
+#                    flag = False
+#                    break
+            if flag:
+                new_keys.append(mesh.split_edge(v, u, t=scale, allow_boundary=True))
+            
+    fkeys_del = []
+    for fkey in list(mesh.faces()):
+        vertices = mesh.face_vertices(fkey)
+        new_vertices = []
+        for key in vertices:
+            if not mesh.get_vertex_attribute(key,'fixed'):
+                new_vertices.append(key)
+        mesh.add_face(new_vertices,fkey=fkey)
+
+    for key in new_keys:
+        mesh.set_vertex_attribute(key,'fixed',True)
+            
+            
+    rs.EnableRedraw(False)
+            
+    lines = []
+    lines_no = []
+    for u,v in mesh.edges():
+        u_fixed = mesh.get_vertex_attribute(u,'fixed')
+        v_fixed = mesh.get_vertex_attribute(v,'fixed')
+        pt_u = mesh.vertex_coordinates(u)
+        pt_v = mesh.vertex_coordinates(v)
+        
+        if not (u_fixed and v_fixed):
+            lines.append(rs.AddLine(pt_u,pt_v))
+        else:
+            lines_no.append(rs.AddLine(pt_u,pt_v))
+        
+    for key in list(mesh.vertices()):
+        if mesh.vertex_degree(key) == 0:
+            del mesh.vertex[key]
+            
+        
+    print mesh
+    rs.AddLayer(layer,[255,0,0])
+    rs.AddLayer(layer+"_",[200,200,200])
+    rs.ObjectLayer(lines,layer)
+    rs.ObjectLayer(lines_no,layer+"_")
+    rs.EnableRedraw(True)
+    
+    
+    
+    
 if __name__ == '__main__':
     
     precision = RVsettings.f_precision
     
-    mesh = get_initial_mesh(precision)
+    mesh, crvs = get_initial_mesh(precision)
+    
     
     trg_len = 0.5
     
@@ -403,10 +601,9 @@ if __name__ == '__main__':
         conduit.Enabled = True
      
         while True:
-            
             #trg_len = rs.GetReal("number")
-            mesh = set_tri_corners(mesh)
-            if not mesh:
+    
+            if not set_tri_corners(mesh):
                 break
             
             if not trg_len:
@@ -415,29 +612,49 @@ if __name__ == '__main__':
             coons_mesh = group_and_mesh(mesh, trg_len)
             mesh_lines = lines_from_mesh(coons_mesh)
             conduit.lines = mesh_lines
-    
+            
             conduit.redraw()
             
+        set_boundary_cond(mesh,coons_mesh,precision)
+        
     except Exception as e:
         print(e)
-    
+
+        
     finally:
         conduit.Enabled = False
         del conduit
+        
     
     mesh_cull_duplicate_vertices(coons_mesh, precision)
     
+    
+    
+    
+    
+    
     fixed = coons_mesh.vertices_on_boundary()
     #mesh_smooth_area(coons_mesh, fixed=fixed, kmax=25,damping=0.5)
-    mesh_smooth_centroid(coons_mesh, fixed=fixed, kmax=25,damping=0.5)
-    
-    artist = MeshArtist(coons_mesh, layer='MeshArtist')
-    artist.clear_layer()
-    artist.draw_edges()
-    #            artist.draw_vertices()
-    #            artist.draw_faces()
-    #            artist.draw_facelabels()
-    #            artist.draw_vertexlabels()
-    artist.redraw()
+    mesh_smooth_centroid(coons_mesh, fixed=fixed, kmax=5,damping=0.5)
     
     
+    create_form_dia(coons_mesh, "form_diagram")
+    
+    
+#    artist = MeshArtist(coons_mesh, layer='MeshArtist')
+#    artist.clear_layer()
+#    artist.draw_edges()
+#    artist.draw_vertices()
+#    #            artist.draw_faces()
+#    #            artist.draw_facelabels()
+#    #            artist.draw_vertexlabels()
+#    artist.redraw()
+#    
+#    
+#    rs.EnableRedraw(False)
+#    
+#    for key, attr in coons_mesh.vertices(True):
+#        if attr['coon_bound']:
+#            rs.AddPoint(coons_mesh.vertex_coordinates(key))
+#        
+#    rs.EnableRedraw(True)
